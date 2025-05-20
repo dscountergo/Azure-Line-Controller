@@ -1,0 +1,12 @@
+# Pliki Visual Studio
+.vs/
+*.user
+*.suo
+
+# Pliki buildów
+bin/
+obj/
+
+# Pliki tymczasowe
+*.log
+*.vsidx
