@@ -1,0 +1,1 @@
+HostName=UL-Hub.azure-devices.net;DeviceId=test_device;SharedAccessKey=aeFLPThI3414+tx6ygfRlc0ucpcJFcAP/raFGdbXxws=

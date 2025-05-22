@@ -1,0 +1,1 @@
+HostName=name-test-ul.azure-devices.net;DeviceId=test;SharedAccessKey=xwI4UvkgfIoEZIeaRJFOISUyWNZah4p9MX57qClxJ5g=
