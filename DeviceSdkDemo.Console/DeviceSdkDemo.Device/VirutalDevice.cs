@@ -20,6 +20,7 @@ namespace DeviceSdkDemo.Device
         private readonly string DeviceName;
         private int lastDesiredProductionRate = -1;
 
+
         public VirutalDevice(DeviceClient DeviceClient)
         {
             deviceClient = DeviceClient;
@@ -71,14 +72,18 @@ namespace DeviceSdkDemo.Device
             var client = new OpcClient(OPCstring);
             client.Connect();
 
+
             var data = new
             {
+                DeviceId = DeviceName,
                 ProductionStatus = client.ReadNode($"ns=2;s={DeviceName}/ProductionStatus").Value,
                 WorkorderId = client.ReadNode($"ns=2;s={DeviceName}/WorkorderId").Value,
                 Temperature = client.ReadNode($"ns=2;s={DeviceName}/Temperature").Value,
                 GoodCount = client.ReadNode($"ns=2;s={DeviceName}/GoodCount").Value,
                 BadCount = client.ReadNode($"ns=2;s={DeviceName}/BadCount").Value,
+
             };
+
 
             var ProductionRate = new OpcReadNode($"ns=2;s={DeviceName}/ProductionRate");
             var DeviceError = new OpcReadNode($"ns=2;s={DeviceName}/DeviceError");
@@ -329,6 +334,7 @@ namespace DeviceSdkDemo.Device
         {
             var errorData = new
             {
+                DeviceId = DeviceName,
                 Timestamp = DateTime.UtcNow,
                 ErrorState = errorState,
                 ErrorDescription = GetErrorDescription(errorState)
