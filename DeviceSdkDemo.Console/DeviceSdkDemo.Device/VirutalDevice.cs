@@ -19,6 +19,7 @@ namespace DeviceSdkDemo.Device
         private readonly string OPCstring;
         private readonly string DeviceName;
         private int lastDesiredProductionRate = -1;
+        private readonly string iotHubDeviceId;
 
 
         public VirutalDevice(DeviceClient DeviceClient)
@@ -26,6 +27,7 @@ namespace DeviceSdkDemo.Device
             deviceClient = DeviceClient;
             OPCstring = AppSettings.GetOpcUaServerUrl();
             DeviceName = AppSettings.GetOpcUaDeviceName();
+            iotHubDeviceId = AppSettings.GetDeviceId();
         }
 
         public async Task TimerSendingMessages()
@@ -75,7 +77,7 @@ namespace DeviceSdkDemo.Device
 
             var data = new
             {
-                DeviceId = DeviceName,
+                DeviceId = iotHubDeviceId,
                 ProductionStatus = client.ReadNode($"ns=2;s={DeviceName}/ProductionStatus").Value,
                 WorkorderId = client.ReadNode($"ns=2;s={DeviceName}/WorkorderId").Value,
                 Temperature = client.ReadNode($"ns=2;s={DeviceName}/Temperature").Value,
@@ -269,7 +271,7 @@ namespace DeviceSdkDemo.Device
             await deviceClient.SetDesiredPropertyUpdateCallbackAsync(OnDesiredPropertyChanged, deviceClient);
             await deviceClient.SetMethodHandlerAsync("EmergencyStop", EmergencyStop, deviceClient);
             await deviceClient.SetMethodHandlerAsync("ClearErrors", ResetErrors, deviceClient);
-
+            await deviceClient.SetMethodHandlerAsync("SetDeviceStatus", SetDeviceStatus, deviceClient);
         }
         /// emergency
         private async Task<MethodResponse> EmergencyStop(MethodRequest methodRequest, object userContext)
@@ -334,7 +336,7 @@ namespace DeviceSdkDemo.Device
         {
             var errorData = new
             {
-                DeviceId = DeviceName,
+                DeviceId = iotHubDeviceId,
                 Timestamp = DateTime.UtcNow,
                 ErrorState = errorState,
                 ErrorDescription = GetErrorDescription(errorState)
@@ -360,6 +362,44 @@ namespace DeviceSdkDemo.Device
             if ((errorState & 1) != 0) errors.Add("Emergency Stop");
             
             return errors.Count > 0 ? string.Join(", ", errors) : "None";
+        }
+
+        private async Task<MethodResponse> SetDeviceStatus(MethodRequest methodRequest, object userContext)
+        {
+            var client = new OpcClient(OPCstring);
+            client.Connect();
+            
+            try
+            {
+                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Received SetDeviceStatus request: {methodRequest.DataAsJson}");
+                var payload = JsonConvert.DeserializeAnonymousType(methodRequest.DataAsJson, new { isRunning = default(bool) });
+                
+                var ProductionStatusNode = new OpcWriteNode($"ns=2;s={DeviceName}/ProductionStatus", payload.isRunning ? 1 : 0);
+                client.WriteNode(ProductionStatusNode);
+                
+                // Aktualizujemy Device Twin
+                var reportedProperties = new TwinCollection();
+                reportedProperties["ProductionStatus"] = payload.isRunning ? 1 : 0;
+                await deviceClient.UpdateReportedPropertiesAsync(reportedProperties);
+                
+                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Set ProductionStatus to: {(payload.isRunning ? "Running (1)" : "Stopped (0)")}");
+                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Updated Device Twin with new status");
+                
+                return new MethodResponse(0);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"\tError setting device status: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"\tInner exception: {ex.InnerException.Message}");
+                }
+                return new MethodResponse(500);
+            }
+            finally
+            {
+                client.Disconnect();
+            }
         }
     }
 }

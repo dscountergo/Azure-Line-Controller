@@ -15,6 +15,7 @@ namespace ServiceSdkDemo.Console
 1 - C2D
 2 - Direct Method
 3 - Device Twin
+4 - Device Status Control
 0 - Exit");
         }
 
@@ -39,8 +40,23 @@ namespace ServiceSdkDemo.Console
                         string deviceId = System.Console.ReadLine() ?? string.Empty;
                         try
                         {
-                            var result = await manager.ExecuteDeviceMethod("SendMessages", deviceId);
-                            System.Console.WriteLine($"Method executed with static {result}");
+                            System.Console.WriteLine("\nAvailable methods:");
+                            System.Console.WriteLine("1 - SendMessages");
+                            System.Console.WriteLine("2 - EmergencyStop");
+                            System.Console.WriteLine("3 - ClearErrors");
+                            System.Console.WriteLine("\nSelect method number:");
+                            
+                            string methodNumber = System.Console.ReadLine() ?? string.Empty;
+                            string methodName = methodNumber switch
+                            {
+                                "1" => "SendMessages",
+                                "2" => "EmergencyStop",
+                                "3" => "ClearErrors",
+                                _ => "SendMessages"
+                            };
+
+                            var result = await manager.ExecuteDeviceMethod(methodName, deviceId);
+                            System.Console.WriteLine($"Method {methodName} executed with status {result}");
                         }
                         catch(DeviceNotFoundException)
                         {
@@ -58,6 +74,29 @@ namespace ServiceSdkDemo.Console
 
                         var random = new Random();
                         await manager.UpdateDesiredTwin(deviceId, propertyName,random.Next());
+                    }
+                    break;
+                case 4:
+                    {
+                        System.Console.WriteLine("\nType your device Id (confirm with Enter):");
+                        string deviceId = System.Console.ReadLine() ?? string.Empty;
+                        try
+                        {
+                            System.Console.WriteLine("\nDevice Status Control:");
+                            System.Console.WriteLine("1 - Start Device");
+                            System.Console.WriteLine("2 - Stop Device");
+                            System.Console.WriteLine("\nSelect option:");
+                            
+                            string option = System.Console.ReadLine() ?? string.Empty;
+                            bool isRunning = option == "1";
+                            
+                            var result = await manager.SetDeviceStatus(deviceId, isRunning);
+                            System.Console.WriteLine($"Device {(isRunning ? "started" : "stopped")} with status {result}");
+                        }
+                        catch(DeviceNotFoundException)
+                        {
+                            System.Console.WriteLine("Device not connected!");
+                        }
                     }
                     break;
                 default:
