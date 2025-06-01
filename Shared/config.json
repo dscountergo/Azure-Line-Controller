@@ -1,0 +1,48 @@
+{
+  "Devices": {
+    "DefaultDevice": "Device1",
+    "Device1": {
+      "Name": "Device1",
+      "OpcUaName": "Device 1",
+      "OpcUaServerUrl": "opc.tcp://localhost:4840/",
+      "IoTHubDeviceId": "Device_001",
+      "IoTHubConnectionString": "HostName=UL-Hub.azure-devices.net;DeviceId=Device_001;SharedAccessKey=eqI0hXWg2VAEUXibHePA4mztbTA3kSpriM9AOM99S3U=",
+      "OpcUaNodeIds": {
+        "ProductionStatus": "ns=2;s={DeviceName}/ProductionStatus",
+        "WorkorderId": "ns=2;s={DeviceName}/WorkorderId",
+        "Temperature": "ns=2;s={DeviceName}/Temperature",
+        "GoodCount": "ns=2;s={DeviceName}/GoodCount",
+        "BadCount": "ns=2;s={DeviceName}/BadCount",
+        "ProductionRate": "ns=2;s={DeviceName}/ProductionRate",
+        "DeviceError": "ns=2;s={DeviceName}/DeviceError",
+        "EmergencyStop": "ns=2;s={DeviceName}/EmergencyStop",
+        "ResetErrorStatus": "ns=2;s={DeviceName}/ResetErrorStatus"
+      }
+    },
+    "Device2": {
+      "Name": "Device2",
+      "OpcUaName": "Device 2",
+      "OpcUaServerUrl": "opc.tcp://localhost:4840/",
+      "IoTHubDeviceId": "Device_002",
+      "IoTHubConnectionString": "HostName=UL-Hub.azure-devices.net;DeviceId=Device_002;SharedAccessKey=637A1MlwVTY+PbYa3EUzDTglwnoJLjhzcGEIZDe8ElQ=",
+      "OpcUaNodeIds": {
+        "ProductionStatus": "ns=2;s={DeviceName}/ProductionStatus",
+        "WorkorderId": "ns=2;s={DeviceName}/WorkorderId",
+        "Temperature": "ns=2;s={DeviceName}/Temperature",
+        "GoodCount": "ns=2;s={DeviceName}/GoodCount",
+        "BadCount": "ns=2;s={DeviceName}/BadCount",
+        "ProductionRate": "ns=2;s={DeviceName}/ProductionRate",
+        "DeviceError": "ns=2;s={DeviceName}/DeviceError",
+        "EmergencyStop": "ns=2;s={DeviceName}/EmergencyStop",
+        "ResetErrorStatus": "ns=2;s={DeviceName}/ResetErrorStatus"
+      }
+    }
+  },
+  "ServiceController": {
+    "ConnectionString": "HostName=UL-Hub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=jybcyeJZG0o98gH4P5c6Gtu25gr/llJwAAIoTGe7gCc="
+  },
+  "ServiceBus": {
+    "ConnectionString": "Endpoint=sb://ul-service-bus.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=L2MXgx/3Eqqv+xxaLP+uhQX8ayax7XR7p+ASbPitzzI=",
+    "QueueName": "emergency-queue"
+  }
+}

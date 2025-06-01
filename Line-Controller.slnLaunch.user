@@ -1,0 +1,19 @@
+[
+  {
+    "Name": "LaunchService",
+    "Projects": [
+      {
+        "Path": "ServiceBusReceiver\\ServiceBusReceiver.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "DeviceLogger\\DeviceLogger.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ServiceConsoleApp\\ServiceConsoleApp.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

@@ -1,11 +1,11 @@
 # Pliki Visual Studio
 .vs/
-*.user
 *.suo
 
 # Pliki buildów
 bin/
 obj/
+DeviceConsoleApp/CertificateStores/
 
 # Pliki tymczasowe
 *.log

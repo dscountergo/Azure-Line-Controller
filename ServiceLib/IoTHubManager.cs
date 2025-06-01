@@ -2,7 +2,7 @@
 using Newtonsoft.Json;
 using System.Text;
 
-namespace ServiceSdkDemo.Lib
+namespace ServiceLib
 {
     public class IoTHubManager
     {
@@ -20,18 +20,18 @@ namespace ServiceSdkDemo.Lib
             var messageBody = new { text = textMessage };
             var message = new Message(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(messageBody)));
             message.MessageId = Guid.NewGuid().ToString();
-            await client.SendAsync(deviceId,message);
+            await client.SendAsync(deviceId, message);
         }
         // Direct Method
         public async Task<int> ExecuteDeviceMethod(string methodName, string deviceId)
         {
             var method = new CloudToDeviceMethod(methodName);
-            
+
             // Dla SendMessages używamy domyślnych parametrów
             if (methodName == "SendMessages")
             {
-            var methodBody = new { nrOfMessages = 5, delay = 500 };
-            method.SetPayloadJson(JsonConvert.SerializeObject(methodBody));
+                var methodBody = new { nrOfMessages = 5, delay = 500 };
+                method.SetPayloadJson(JsonConvert.SerializeObject(methodBody));
             }
             // Dla EmergencyStop i ClearErrors nie potrzebujemy parametrów
             else
@@ -43,7 +43,7 @@ namespace ServiceSdkDemo.Lib
             return result.Status;
         }
         // Device Twin
-        public async Task UpdateDesiredTwin(string deviceId, string propertyName, dynamic propertyValue) 
+        public async Task UpdateDesiredTwin(string deviceId, string propertyName, dynamic propertyValue)
         {
             var twin = await registry.GetTwinAsync(deviceId);
             twin.Properties.Desired[propertyName] = propertyValue;
@@ -65,6 +65,6 @@ namespace ServiceSdkDemo.Lib
             var result = await client.InvokeDeviceMethodAsync(deviceId, method);
             return result.Status;
         }
-        
+
     }
 }

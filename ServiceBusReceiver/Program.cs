@@ -12,17 +12,18 @@ class Program
 
     static async Task Main(string[] args)
     {
+        Console.Title = "Emergency Alert Handler";
         AppSettings.Initialize();
 
         string connectionString = AppSettings.GetServiceBusConnectionString();
         string queueName = "emergency-queue";
 
         var client = new ServiceBusClient(connectionString);
-        
+
         Console.WriteLine("Starting queue cleanup...");
         await CleanOldMessages(client, queueName);
         Console.WriteLine("Starting message processor...");
-        
+
         var processor = client.CreateProcessor(queueName, new ServiceBusProcessorOptions());
 
         var serviceClient = ServiceClient.CreateFromConnectionString(AppSettings.GetServiceConnectionString());
@@ -35,7 +36,7 @@ class Program
                 var body = args.Message.Body.ToString();
                 Console.WriteLine($"\n\tProcessing message from {args.Message.EnqueuedTime}:");
                 Console.WriteLine($"\tMessage content: {body}");
-                
+
                 var alert = JsonConvert.DeserializeObject<Alert>(body);
                 if (alert == null)
                 {
@@ -97,10 +98,10 @@ class Program
             var receiver = client.CreateReceiver(queueName);
             int removedCount = 0;
             int keptCount = 0;
-            
+
             // Dodajemy timeout dla operacji czyszczenia
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            
+
             while (!cts.Token.IsCancellationRequested)
             {
                 try
@@ -141,7 +142,7 @@ class Program
                     break;
                 }
             }
-            
+
             Console.WriteLine($"Queue cleaning completed. Removed {removedCount} old messages, kept {keptCount} recent messages.");
         }
         catch (Exception ex)
@@ -210,14 +211,14 @@ class Program
             {
                 try
                 {
-            var methodInvocation = new CloudToDeviceMethod("EmergencyStop")
-            {
+                    var methodInvocation = new CloudToDeviceMethod("EmergencyStop")
+                    {
                         ResponseTimeout = TimeSpan.FromSeconds(30)
-            };
+                    };
 
                     Console.WriteLine($"\tAttempt {i + 1}/{maxRetries}: Invoking EmergencyStop method...");
-            var response = await serviceClient.InvokeDeviceMethodAsync(deviceId, methodInvocation);
-            
+                    var response = await serviceClient.InvokeDeviceMethodAsync(deviceId, methodInvocation);
+
                     Console.WriteLine($"\tEmergency Stop triggered successfully");
                     Console.WriteLine($"\tDevice response: {response.GetPayloadAsJson()}");
                     emergencyStopTriggered = true;

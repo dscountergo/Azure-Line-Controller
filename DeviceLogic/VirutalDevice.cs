@@ -1,18 +1,22 @@
 ﻿using Microsoft.Azure.Devices.Client;
 using Microsoft.Azure.Devices.Shared;
 using Newtonsoft.Json;
-using System.ComponentModel.Design;
-using System.Net.Mime;
-using System.Text;
 using Opc.UaFx;
 using Opc.UaFx.Client;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using Shared;
 using Shared.Configuration;
+using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Net.Mime;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml;
+using DeviceLogger;
 
-namespace DeviceSdkDemo.Device
+namespace DeviceLogic
 {
-    public class VirutalDevice
+    public class VirtualDevice : IDisposable
     {
         private readonly DeviceClient deviceClient;
         private int lastErrorState = 0;
@@ -20,51 +24,109 @@ namespace DeviceSdkDemo.Device
         private readonly string DeviceName;
         private int lastDesiredProductionRate = -1;
         private readonly string iotHubDeviceId;
+        private readonly DeviceConfiguration deviceConfig;
+        private bool isRunning = false;
+        private readonly RabbitMQService _rabbitMQService;
 
-
-        public VirutalDevice(DeviceClient DeviceClient)
+        public VirtualDevice(DeviceConfiguration config)
         {
-            deviceClient = DeviceClient;
-            OPCstring = AppSettings.GetOpcUaServerUrl();
-            DeviceName = AppSettings.GetOpcUaDeviceName();
-            iotHubDeviceId = AppSettings.GetDeviceId();
+            deviceConfig = config;
+            OPCstring = deviceConfig.OpcUaServerUrl;
+            DeviceName = deviceConfig.OpcUaName;
+            iotHubDeviceId = deviceConfig.IoTHubDeviceId;
+            deviceClient = DeviceClient.CreateFromConnectionString(deviceConfig.IoTHubConnectionString);
+            _rabbitMQService = new RabbitMQService();
+        }
+
+        public async Task StartAsync()
+        {
+            if (isRunning)
+            {
+                return;
+            }
+
+            isRunning = true;
+            await InitializeHandlers();
+            LogMessage("Device started");
+            
+            while (isRunning)
+            {
+                try
+                {
+                    await TimerSendingMessages();
+                    await Task.Delay(2000);
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"Error: {ex.Message}");
+                    await Task.Delay(5000); // Czekaj przed ponowną próbą
+                }
+            }
+        }
+
+        public async Task StopAsync()
+        {
+            if (!isRunning)
+            {
+                return;
+            }
+
+            isRunning = false;
+            LogMessage("Stopping device...");
+            await deviceClient.CloseAsync();
+            LogMessage("Device stopped");
+        }
+
+        private void LogMessage(string message)
+        {
+            _rabbitMQService.PublishLog(DeviceName, message);
         }
 
         public async Task TimerSendingMessages()
         {
             var client = new OpcClient(OPCstring);
-            client.Connect();
-
-            var ProductionStatus = new OpcReadNode($"ns=2;s={DeviceName}/ProductionStatus");
-            int RetValues = client.ReadNode(ProductionStatus).As<int>();
-            
-            var ProductionRate = new OpcReadNode($"ns=2;s={DeviceName}/ProductionRate");
-            int currentRate = client.ReadNode(ProductionRate).As<int>();
-            
-            var DeviceError = new OpcReadNode($"ns=2;s={DeviceName}/DeviceError");
-            int DeviceErrorNode = client.ReadNode(DeviceError).As<int>();
-
-            client.Disconnect();
-
-            // Sprawdzamy czy aktualna wartość Production Rate różni się od Desired
-            var twin = await deviceClient.GetTwinAsync();
-            if (twin.Properties.Desired.Contains("ProductionRate"))
+            try
             {
-                int desiredRate = twin.Properties.Desired["ProductionRate"];
-                if (currentRate != desiredRate)
+                client.Connect();
+
+                var ProductionStatus = new OpcReadNode($"ns=2;s={DeviceName}/ProductionStatus");
+                int RetValues = client.ReadNode(ProductionStatus).As<int>();
+
+                var ProductionRate = new OpcReadNode($"ns=2;s={DeviceName}/ProductionRate");
+                int currentRate = client.ReadNode(ProductionRate).As<int>();
+
+                var DeviceError = new OpcReadNode($"ns=2;s={DeviceName}/DeviceError");
+                int DeviceErrorNode = client.ReadNode(DeviceError).As<int>();
+
+                // Sprawdzamy czy aktualna wartość Production Rate różni się od Desired
+                var twin = await deviceClient.GetTwinAsync();
+                if (twin.Properties.Desired.Contains("ProductionRate"))
                 {
-                    // Jeśli wartość się różni, próbujemy przywrócić żądaną wartość
-                    await SetProductionRate(desiredRate);
+                    int desiredRate = twin.Properties.Desired["ProductionRate"];
+                    if (currentRate != desiredRate)
+                    {
+                        // Jeśli wartość się różni, próbujemy przywrócić żądaną wartość
+                        await SetProductionRate(desiredRate);
+                    }
+                }
+
+                if (RetValues == 1)
+                {
+                    await SendMessages(1, 1);
+                }
+                else
+                {
+                    LogMessage("Device offline");
                 }
             }
-            
-            if (RetValues == 1)
+            catch (Exception ex)
             {
-                await SendMessages(1, 1);
+                LogMessage($"Error while reading data: {ex.Message}");
+                throw;
             }
-            else
+            finally
             {
-                Console.WriteLine("Device Offline");
+                client.Disconnect();
             }
         }
 
@@ -72,45 +134,53 @@ namespace DeviceSdkDemo.Device
         public async Task SendMessages(int nrOfMessages, int delay)
         {
             var client = new OpcClient(OPCstring);
-            client.Connect();
-
-
-            var data = new
+            try
             {
-                DeviceId = iotHubDeviceId,
-                ProductionStatus = client.ReadNode($"ns=2;s={DeviceName}/ProductionStatus").Value,
-                WorkorderId = client.ReadNode($"ns=2;s={DeviceName}/WorkorderId").Value,
-                Temperature = client.ReadNode($"ns=2;s={DeviceName}/Temperature").Value,
-                GoodCount = client.ReadNode($"ns=2;s={DeviceName}/GoodCount").Value,
-                BadCount = client.ReadNode($"ns=2;s={DeviceName}/BadCount").Value,
+                client.Connect();
 
-            };
+                var data = new
+                {
+                    DeviceId = iotHubDeviceId,
+                    ProductionStatus = client.ReadNode($"ns=2;s={DeviceName}/ProductionStatus").Value,
+                    WorkorderId = client.ReadNode($"ns=2;s={DeviceName}/WorkorderId").Value,
+                    Temperature = client.ReadNode($"ns=2;s={DeviceName}/Temperature").Value,
+                    GoodCount = client.ReadNode($"ns=2;s={DeviceName}/GoodCount").Value,
+                    BadCount = client.ReadNode($"ns=2;s={DeviceName}/BadCount").Value,
+                };
 
+                var ProductionRate = new OpcReadNode($"ns=2;s={DeviceName}/ProductionRate");
+                var DeviceError = new OpcReadNode($"ns=2;s={DeviceName}/DeviceError");
+                int ProductionRateNode = client.ReadNode(ProductionRate).As<int>();
+                int DeviceErrorNode = client.ReadNode(DeviceError).As<int>();
 
-            var ProductionRate = new OpcReadNode($"ns=2;s={DeviceName}/ProductionRate");
-            var DeviceError = new OpcReadNode($"ns=2;s={DeviceName}/DeviceError");
-            int ProductionRateNode = client.ReadNode(ProductionRate).As<int>();
-            int DeviceErrorNode = client.ReadNode(DeviceError).As<int>();
+                await UpdateTwinData(ProductionRateNode, DeviceErrorNode);
 
-            await UpdateTwinData(ProductionRateNode, DeviceErrorNode);
+                var dataString = JsonConvert.SerializeObject(data);
+                Message eventMessage = new Message(Encoding.UTF8.GetBytes(dataString));
+                eventMessage.ContentType = MediaTypeNames.Application.Json;
+                eventMessage.ContentEncoding = "utf-8";
+                LogMessage($"Data sent: [{dataString}]");
 
-            var dataString = JsonConvert.SerializeObject(data);
-            Message eventMessage = new Message(Encoding.UTF8.GetBytes(dataString));
-            eventMessage.ContentType = MediaTypeNames.Application.Json;
-            eventMessage.ContentEncoding = "utf-8";
-            Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Data: [{dataString}]");
-
-            await deviceClient.SendEventAsync(eventMessage);
-            client.Disconnect();
+                await deviceClient.SendEventAsync(eventMessage);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error while sending data: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                client.Disconnect();
+            }
         }
         #endregion
         #region Receive Message
         private async Task OnC2MessageReceivedAsync(Message receivedMessage, object _)
         {
-            Console.WriteLine($"\t{DateTime.Now} > C2D message callback - message received with Id={receivedMessage.MessageId}");
+            LogMessage($"\t{DateTime.Now} > C2D message callback - message received with Id={receivedMessage.MessageId}");
             PrintMessages(receivedMessage);
             await deviceClient.CompleteAsync(receivedMessage);
-            Console.WriteLine($"\t{DateTime.Now}> Completed C2D message with Id={receivedMessage.MessageId}.");
+            LogMessage($"\t{DateTime.Now}> Completed C2D message with Id={receivedMessage.MessageId}.");
 
             receivedMessage.Dispose();
         }
@@ -123,11 +193,11 @@ namespace DeviceSdkDemo.Device
             var twin = await deviceClient.GetTwinAsync();
             var reportedProperties = new TwinCollection();
 
-            string ReportedErrorStatus = twin.Properties.Reported.Contains("ErrorStatus") 
-                ? twin.Properties.Reported["ErrorStatus"] 
+            string ReportedErrorStatus = twin.Properties.Reported.Contains("ErrorStatus")
+                ? twin.Properties.Reported["ErrorStatus"]
                 : "";
-            int ReportedProductionRate = twin.Properties.Reported.Contains("ProductionRate") 
-                ? twin.Properties.Reported["ProductionRate"] 
+            int ReportedProductionRate = twin.Properties.Reported.Contains("ProductionRate")
+                ? twin.Properties.Reported["ProductionRate"]
                 : 0;
 
             if (!twin.Properties.Reported.Contains("ErrorStatus"))
@@ -145,32 +215,32 @@ namespace DeviceSdkDemo.Device
             {
                 reportedProperties["ErrorStatus"] = DeviceErrorString;
                 await deviceClient.UpdateReportedPropertiesAsync(reportedProperties);
-                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Updated ErrorStatus in Device Twin: {DeviceErrorString}");
-                
+                LogMessage($"\t{DateTime.Now.ToLocalTime()}> Updated ErrorStatus in Device Twin: {DeviceErrorString}");
+
                 if (lastErrorState != DeviceError)
                 {
                     await SendErrorStateMessage(DeviceError);
                     lastErrorState = DeviceError;
                 }
             }
-            
+
             if (ReportedProductionRate != ProductionRate)
             {
                 reportedProperties["ProductionRate"] = ProductionRate;
                 await deviceClient.UpdateReportedPropertiesAsync(reportedProperties);
-                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Updated ProductionRate in Device Twin: {ProductionRate}");
+                LogMessage($"\t{DateTime.Now.ToLocalTime()}> Updated ProductionRate in Device Twin: {ProductionRate}");
             }
         }
 
         private void PrintMessages(Message receivedMessage)
         {
             string messageData = Encoding.ASCII.GetString(receivedMessage.GetBytes());
-            Console.WriteLine($"\t\tReceived message: {messageData}");
+            LogMessage($"\t\tReceived message: {messageData}");
 
             int propCount = 0;
             foreach (var prop in receivedMessage.Properties)
             {
-                Console.WriteLine($"\t\tProperty[{propCount++} > Key={prop.Key} : Value={prop.Value}");
+                LogMessage($"\t\tProperty[{propCount++} > Key={prop.Key} : Value={prop.Value}");
             }
         }
         #endregion
@@ -178,7 +248,7 @@ namespace DeviceSdkDemo.Device
 
         private async Task<MethodResponse> SendMessagesHandler(MethodRequest methodRequest, object userContext)
         {
-            Console.WriteLine($"\tMETHOD EXECUTED: {methodRequest.Name}");
+            LogMessage($"\tMETHOD EXECUTED: {methodRequest.Name}");
 
             var payload = JsonConvert.DeserializeAnonymousType(methodRequest.DataAsJson, new { nrOfMessages = default(int), delay = default(int) });
             await SendMessages(payload.nrOfMessages, payload.delay);
@@ -188,7 +258,7 @@ namespace DeviceSdkDemo.Device
 
         private async Task<MethodResponse> DefaultServiceHandler(MethodRequest methodRequest, object userContext)
         {
-            Console.WriteLine($"\tMETHOD EXECUTED: {methodRequest.Name}");
+            LogMessage($"\tMETHOD EXECUTED: {methodRequest.Name}");
 
             await Task.Delay(1000);
 
@@ -202,8 +272,8 @@ namespace DeviceSdkDemo.Device
         {
             var twin = await deviceClient.GetTwinAsync();
 
-            Console.WriteLine($"\n Initial twin value received: \n{JsonConvert.SerializeObject(twin, Formatting.Indented)}");
-            Console.WriteLine();
+            LogMessage($"\n Initial twin value received: \n{Newtonsoft.Json.JsonConvert.SerializeObject(twin, Newtonsoft.Json.Formatting.Indented)}");
+            LogMessage("");
 
             var reportedProperties = new TwinCollection();
             reportedProperties["DateTimeLastAppLaunch"] = DateTime.Now;
@@ -211,7 +281,7 @@ namespace DeviceSdkDemo.Device
             // Sprawdzamy czy Desired Production Rate istnieje
             if (!twin.Properties.Desired.Contains("ProductionRate"))
             {
-                Console.WriteLine("\tWarning: Desired Production Rate not set in cloud. Waiting for cloud to set initial value.");
+                LogMessage("\tWarning: Desired Production Rate not set in cloud. Waiting for cloud to set initial value.");
             }
 
             await deviceClient.UpdateReportedPropertiesAsync(reportedProperties);
@@ -219,8 +289,8 @@ namespace DeviceSdkDemo.Device
 
         private async Task OnDesiredPropertyChanged(TwinCollection desiredProperties, object _)
         {
-            Console.WriteLine($"\tDesired property change\n\t {JsonConvert.SerializeObject(desiredProperties)}");
-            
+            LogMessage($"\tDesired property change\n\t {JsonConvert.SerializeObject(desiredProperties)}");
+
             if (desiredProperties.Contains("ProductionRate"))
             {
                 int desiredRate = desiredProperties["ProductionRate"];
@@ -240,19 +310,19 @@ namespace DeviceSdkDemo.Device
         {
             var client = new OpcClient(OPCstring);
             client.Connect();
-            
+
             try
             {
                 // Ustawiamy nową wartość Production Rate na maszynie
                 var ProductionRateNode = new OpcWriteNode($"ns=2;s={DeviceName}/ProductionRate", rate);
                 client.WriteNode(ProductionRateNode);
-                
+
                 // Aktualizujemy Device Twin
                 var reportedProperties = new TwinCollection();
                 reportedProperties["ProductionRate"] = rate;
                 await deviceClient.UpdateReportedPropertiesAsync(reportedProperties);
-                
-                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Set Production Rate to: {rate}%");
+
+                LogMessage($"\t{DateTime.Now.ToLocalTime()}> Set Production Rate to: {rate}%");
             }
             finally
             {
@@ -280,12 +350,12 @@ namespace DeviceSdkDemo.Device
             client.Connect();
             await Task.Delay(1000);
             client.CallMethod($"ns=2;s={DeviceName}", $"ns=2;s={DeviceName}/EmergencyStop");
-            
+
             // Ustawiamy flagę Emergency Stop (bit 0)
             await SetErrorFlag(1);
 
             client.Disconnect();
-            Console.WriteLine("STOP!!!!!!");
+            LogMessage("STOP!!!!!!");
             return new MethodResponse(0);
         }
         /// reset errors
@@ -295,12 +365,12 @@ namespace DeviceSdkDemo.Device
             client.Connect();
             await Task.Delay(1000);
             client.CallMethod($"ns=2;s={DeviceName}", $"ns=2;s={DeviceName}/ResetErrorStatus");
-            
+
             // Resetujemy wszystkie flagi błędów
             await SetErrorFlag(0);
 
             client.Disconnect();
-            Console.WriteLine("Errors Reseted =)");
+            LogMessage("Errors Reseted");
             return new MethodResponse(0);
         }
 
@@ -308,21 +378,21 @@ namespace DeviceSdkDemo.Device
         {
             var client = new OpcClient(OPCstring);
             client.Connect();
-            
+
             try
             {
                 // Odczytujemy aktualny stan błędów
                 var DeviceError = new OpcReadNode($"ns=2;s={DeviceName}/DeviceError");
                 int currentErrorState = client.ReadNode(DeviceError).As<int>();
-                
+
                 // Jeśli errorFlag = 0, resetujemy wszystkie flagi
                 // W przeciwnym razie ustawiamy odpowiednią flagę
                 int newErrorState = errorFlag == 0 ? 0 : (currentErrorState | errorFlag);
-                
+
                 // Ustawiamy nowy stan błędów
                 var DeviceErrorNode = new OpcWriteNode($"ns=2;s={DeviceName}/DeviceError", newErrorState);
                 client.WriteNode(DeviceErrorNode);
-                
+
                 // Aktualizujemy Device Twin i wysyłamy wiadomość D2C
                 await UpdateTwinData(0, newErrorState);
             }
@@ -347,20 +417,20 @@ namespace DeviceSdkDemo.Device
             errorMessage.ContentType = MediaTypeNames.Application.Json;
             errorMessage.ContentEncoding = "utf-8";
             errorMessage.Properties.Add("MessageType", "ErrorState");
-            
-            Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Sending Error State: [{errorMessageString}]");
+
+            LogMessage($"\t{DateTime.Now.ToLocalTime()}> Sending Error State: [{errorMessageString}]");
             await deviceClient.SendEventAsync(errorMessage);
         }
 
         private string GetErrorDescription(int errorState)
         {
             List<string> errors = new List<string>();
-            
+
             if ((errorState & 8) != 0) errors.Add("Unknown Error");
             if ((errorState & 4) != 0) errors.Add("Sensor Failure");
             if ((errorState & 2) != 0) errors.Add("Power Failure");
             if ((errorState & 1) != 0) errors.Add("Emergency Stop");
-            
+
             return errors.Count > 0 ? string.Join(", ", errors) : "None";
         }
 
@@ -368,31 +438,32 @@ namespace DeviceSdkDemo.Device
         {
             var client = new OpcClient(OPCstring);
             client.Connect();
-            
+
             try
             {
-                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Received SetDeviceStatus request: {methodRequest.DataAsJson}");
+                LogMessage($"\t{DateTime.Now.ToLocalTime()}> Received SetDeviceStatus request: {methodRequest.DataAsJson}");
                 var payload = JsonConvert.DeserializeAnonymousType(methodRequest.DataAsJson, new { isRunning = default(bool) });
-                
+
+                // Ustawiamy bezpośrednio wartość ProductionStatus (1 = running, 0 = stopped)
                 var ProductionStatusNode = new OpcWriteNode($"ns=2;s={DeviceName}/ProductionStatus", payload.isRunning ? 1 : 0);
                 client.WriteNode(ProductionStatusNode);
-                
+
                 // Aktualizujemy Device Twin
                 var reportedProperties = new TwinCollection();
                 reportedProperties["ProductionStatus"] = payload.isRunning ? 1 : 0;
                 await deviceClient.UpdateReportedPropertiesAsync(reportedProperties);
-                
-                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Set ProductionStatus to: {(payload.isRunning ? "Running (1)" : "Stopped (0)")}");
-                Console.WriteLine($"\t{DateTime.Now.ToLocalTime()}> Updated Device Twin with new status");
-                
+
+                LogMessage($"\t{DateTime.Now.ToLocalTime()}> Set ProductionStatus to: {(payload.isRunning ? "Running (1)" : "Stopped (0)")}");
+                LogMessage($"\t{DateTime.Now.ToLocalTime()}> Updated Device Twin with new status");
+
                 return new MethodResponse(0);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"\tError setting device status: {ex.Message}");
+                LogMessage($"\tError setting device status: {ex.Message}");
                 if (ex.InnerException != null)
                 {
-                    Console.WriteLine($"\tInner exception: {ex.InnerException.Message}");
+                    LogMessage($"\tInner exception: {ex.InnerException.Message}");
                 }
                 return new MethodResponse(500);
             }
@@ -400,6 +471,12 @@ namespace DeviceSdkDemo.Device
             {
                 client.Disconnect();
             }
+        }
+
+        public void Dispose()
+        {
+            _rabbitMQService?.Dispose();
+            deviceClient?.Dispose();
         }
     }
 }

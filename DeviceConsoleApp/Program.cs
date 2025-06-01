@@ -1,4 +1,4 @@
-﻿using DeviceSdkDemo.Device;
+﻿using DeviceLogic;
 using Microsoft.Azure.Devices.Client;
 using System;
 using System.Text;
@@ -7,14 +7,12 @@ using Shared.Configuration;
 
 AppSettings.Initialize();
 
-
-//string deviceConnectionString = File.ReadAllText(@"ConnectionString.txt");
-//string deviceConnectionString = "HostName=UL-Hub.azure-devices.net;DeviceId=test_device;SharedAccessKey=aeFLPThI3414+tx6ygfRlc0ucpcJFcAP/raFGdbXxws=";
-string deviceConnectionString = AppSettings.GetAzureIoTHubConnectionString();
+var deviceConfig = AppSettings.GetDeviceConfiguration();
+string deviceConnectionString = deviceConfig.IoTHubConnectionString;
 
 using var deviceClient = DeviceClient.CreateFromConnectionString(deviceConnectionString, TransportType.Mqtt);
 await deviceClient.OpenAsync();
-var device = new VirutalDevice(deviceClient);
+var device = new VirtualDevice(deviceConfig);
 Console.WriteLine("Connection success");
 await device.InitializeHandlers();
 await device.UpdateTwinAsync();
