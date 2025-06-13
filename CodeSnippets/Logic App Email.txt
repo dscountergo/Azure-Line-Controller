@@ -1,0 +1,7 @@
+
+Subject and Body content of email sending element in code view:
+
+
+
+"Subject": "Alert: Device Errors for @{json(base64ToString(triggerBody()?['ContentData']))?['DeviceId']}",
+"Body": "<p class=\"editor-paragraph\">Device Alert for @{json(base64ToString(triggerBody()?['ContentData']))?['DeviceId']}<br><br>Time Window: @{json(base64ToString(triggerBody()?['ContentData']))?['WindowEnd']}<br><br>Detected Errors:<br>@{json(base64ToString(triggerBody()?['ContentData']))?['ErrorDescription']}<br><br>Error Details:<br>- Emergency Stop: @{if(equals(json(base64ToString(triggerBody()?['ContentData']))?['HadEmergencyStop'], 1), 'YES', 'NO')}<br>- Power Failure: @{if(equals(json(base64ToString(triggerBody()?['ContentData']))?['HadPowerFailure'], 1), 'YES', 'NO')}<br>- Sensor Failure: @{if(equals(json(base64ToString(triggerBody()?['ContentData']))?['HadSensorFailure'], 1), 'YES', 'NO')}<br>- Unknown Error: @{if(equals(json(base64ToString(triggerBody()?['ContentData']))?['HadUnknownError'], 1), 'YES', 'NO')}<br><br><i><em class=\"editor-text-italic\">This alert was automatically generated based on device data.</em></i></p>"

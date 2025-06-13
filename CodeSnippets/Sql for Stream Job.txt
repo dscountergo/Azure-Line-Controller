@@ -1,0 +1,200 @@
+
+
+SQL for Stream Job:
+
+
+-- Production KPI archivization
+WITH WindowData AS (
+    SELECT
+        DeviceId,
+        System.Timestamp() AS WindowEnd,
+        MIN(CAST(GoodCount AS bigint)) AS StartGoodCount,
+        MAX(CAST(GoodCount AS bigint)) AS EndGoodCount,
+        MIN(CAST(BadCount AS bigint)) AS StartBadCount,
+        MAX(CAST(BadCount AS bigint)) AS EndBadCount
+    FROM
+        [eventhub-iot-telemetry]
+    GROUP BY
+        DeviceId,
+        TumblingWindow(minute, 5)
+)
+SELECT
+    DeviceId,
+    WindowEnd,
+    EndGoodCount - StartGoodCount AS GoodCount,
+    EndBadCount - StartBadCount AS BadCount,
+    CASE 
+        WHEN (EndGoodCount - StartGoodCount + EndBadCount - StartBadCount) = 0 THEN 0
+        ELSE ((EndGoodCount - StartGoodCount) * 100.0) / 
+             (EndGoodCount - StartGoodCount + EndBadCount - StartBadCount)
+    END AS GoodProductionPercentage
+INTO
+    [output-production-kpis]
+FROM
+    WindowData
+    
+
+
+-- Average temperature archivization
+SELECT
+    DeviceId,
+    System.Timestamp() AS WindowEnd,
+    AVG(CAST(Temperature AS float)) AS AvgTemperature,
+    MIN(CAST(Temperature AS float)) AS MinTemperature,
+    MAX(CAST(Temperature AS float)) AS MaxTemperature
+INTO
+    [output-temperature-stats]
+FROM
+    [eventhub-iot-telemetry]
+WHERE
+    Temperature > 0 AND Temperature < 1000
+GROUP BY
+    DeviceId,
+    HoppingWindow(minute, 5, 1)      
+
+
+
+
+-- Device error alert archivization
+
+SELECT
+    DeviceId,
+    System.Timestamp() AS WindowEnd,
+    MAX(CASE WHEN (ErrorState & 1) != 0 THEN 1 ELSE 0 END) AS HadEmergencyStop,
+    MAX(CASE WHEN (ErrorState & 2) != 0 THEN 1 ELSE 0 END) AS HadPowerFailure,
+    MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) AS HadSensorFailure,
+    MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) AS HadUnknownError,
+    MAX(CASE WHEN (ErrorState & 1) != 0 THEN 1 ELSE 0 END) +
+    MAX(CASE WHEN (ErrorState & 2) != 0 THEN 1 ELSE 0 END) +
+    MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) +
+    MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) AS TotalErrorTypes
+INTO
+    [output-device-errors]
+FROM
+    [eventhub-iot-telemetry]
+WHERE
+    ErrorState > 0
+GROUP BY
+    DeviceId,
+    TumblingWindow(minute, 1)
+HAVING
+    MAX(CASE WHEN (ErrorState & 1) != 0 THEN 1 ELSE 0 END) +
+    MAX(CASE WHEN (ErrorState & 2) != 0 THEN 1 ELSE 0 END) +
+    MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) +
+    MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) > 2
+
+
+
+
+
+
+
+    
+-- Sending errors to handler
+SELECT
+    DeviceId,
+    WindowEnd,
+    AlertType,
+    ErrorCount,
+    GoodProductionPercentage
+INTO
+    [output-emergency-queue]
+FROM
+    (
+        -- Error alerts from device
+        SELECT
+            DeviceId,
+            WindowEnd,
+            'Error' AS AlertType,
+            TotalErrorTypes AS ErrorCount,
+            NULL AS GoodProductionPercentage
+        FROM
+            (
+                SELECT
+                    DeviceId,
+                    System.Timestamp() AS WindowEnd,
+                    MAX(CASE WHEN (ErrorState & 1) != 0 THEN 1 ELSE 0 END) +
+                    MAX(CASE WHEN (ErrorState & 2) != 0 THEN 1 ELSE 0 END) +
+                    MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) +
+                    MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) AS TotalErrorTypes
+                FROM
+                    [eventhub-iot-telemetry]
+                WHERE
+                    ErrorState > 0
+                GROUP BY
+                    DeviceId,
+                    TumblingWindow(minute, 1)
+                HAVING
+                    MAX(CASE WHEN (ErrorState & 1) != 0 THEN 1 ELSE 0 END) +
+                    MAX(CASE WHEN (ErrorState & 2) != 0 THEN 1 ELSE 0 END) +
+                    MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) +
+                    MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) > 2
+            ) AS ErrorMetrics
+
+        UNION ALL
+
+        -- Detected production alerts
+        SELECT
+            DeviceId,
+            WindowEnd,
+            'Production' AS AlertType,
+            NULL AS ErrorCount,
+            GoodProductionPercentage
+        FROM
+            (
+                SELECT
+                    DeviceId,
+                    WindowEnd,
+                    CASE 
+                        WHEN (EndGoodCount - StartGoodCount + EndBadCount - StartBadCount) = 0 THEN 0
+                        ELSE ((EndGoodCount - StartGoodCount) * 100.0) / 
+                             (EndGoodCount - StartGoodCount + EndBadCount - StartBadCount)
+                    END AS GoodProductionPercentage
+                FROM
+                    (
+                        SELECT
+                            DeviceId,
+                            System.Timestamp() AS WindowEnd,
+                            MIN(CAST(GoodCount AS bigint)) AS StartGoodCount,
+                            MAX(CAST(GoodCount AS bigint)) AS EndGoodCount,
+                            MIN(CAST(BadCount AS bigint)) AS StartBadCount,
+                            MAX(CAST(BadCount AS bigint)) AS EndBadCount
+                        FROM
+                            [eventhub-iot-telemetry]
+                        GROUP BY
+                            DeviceId,
+                            TumblingWindow(minute, 5)
+                    ) AS WindowData
+            ) AS ProductionMetrics
+        WHERE
+            GoodProductionPercentage < 90
+    ) AS CombinedAlerts
+
+-- Email error report
+
+SELECT
+    DeviceId,
+    System.Timestamp() AS WindowEnd,
+    MAX(CASE WHEN (ErrorState & 1) != 0 THEN 1 ELSE 0 END) AS HadEmergencyStop,
+    MAX(CASE WHEN (ErrorState & 2) != 0 THEN 1 ELSE 0 END) AS HadPowerFailure,
+    MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) AS HadSensorFailure,
+    MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) AS HadUnknownError,
+    STRING_AGG(
+        CASE 
+            WHEN (ErrorState & 1) != 0 THEN 'Emergency Stop'
+            WHEN (ErrorState & 2) != 0 THEN 'Power Failure'
+            WHEN (ErrorState & 4) != 0 THEN 'Sensor Failure'
+            WHEN (ErrorState & 8) != 0 THEN 'Unknown Error'
+            ELSE 'No Error'
+        END,
+        ', '
+    ) AS ErrorDescription
+INTO
+    [output-email-queue]
+FROM
+    [eventhub-iot-telemetry]
+WHERE
+    ErrorState > 0
+GROUP BY
+    DeviceId,
+    TumblingWindow(minute, 1)

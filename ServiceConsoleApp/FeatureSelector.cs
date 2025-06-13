@@ -112,7 +112,6 @@ Press 'ESC' to go back
 1 - Send C2D Message
 2 - Execute Direct Method
 3 - Update Device Twin
-4 - Control Device Status
 0 - Back to Device List
 
 Press 'ESC' to go back
@@ -303,9 +302,6 @@ Press 'ESC' to go back
                         case 3:
                             await HandleDeviceTwin(manager, deviceId);
                             break;
-                        case 4:
-                            await HandleDeviceStatus(manager, deviceId);
-                            break;
                         case 0:
                             return;
                     }
@@ -429,52 +425,6 @@ Press 'ESC' to go back
             await manager.UpdateDesiredTwin(iotHubDeviceId, propertyName, random.Next());
             System.Console.WriteLine("\nPress any key to continue...");
             System.Console.ReadKey();
-        }
-
-        private static async Task HandleDeviceStatus(ServiceLib.IoTHubManager manager, string deviceId)
-        {
-            while (true)
-            {
-                System.Console.Clear();
-                System.Console.WriteLine(@"
-=== Device Status Control ===
-1 - Start Device
-2 - Stop Device
-0 - Back to Device Menu
-
-Press 'ESC' to go back
-");
-
-                var key = System.Console.ReadKey();
-
-                if (key.Key == ConsoleKey.Escape)
-                {
-                    break;
-                }
-
-                if (int.TryParse(key.KeyChar.ToString(), out int option))
-                {
-                    if (option == 0)
-                    {
-                        return;
-                    }
-
-                    bool isRunning = option == 1;
-
-                    try
-                    {
-                        string iotHubDeviceId = Shared.Configuration.AppSettings.GetIoTHubDeviceId(deviceId);
-                        var result = await manager.SetDeviceStatus(iotHubDeviceId, isRunning);
-                        System.Console.WriteLine($"\nDevice {(isRunning ? "started" : "stopped")} with status {result}");
-                    }
-                    catch (DeviceNotFoundException)
-                    {
-                        System.Console.WriteLine("\nDevice not connected!");
-                    }
-                    System.Console.WriteLine("\nPress any key to continue...");
-                    System.Console.ReadKey();
-                }
-            }
         }
 
         internal static int ReadInput()
