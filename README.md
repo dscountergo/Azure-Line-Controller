@@ -179,7 +179,7 @@ Panel główny oferuje następujące funkcjonalności:
      - Uruchomienie serii wiadomości testowych z urządzenia na chmurę
      - Resetowanie błędów
      - Zatrzymanie awaryjne
-   - Monitorowanie stanu urządzenia (tylko odczyt)
+   - Dodawanie nowej własności do device twin
    - _**Production Rate zmieniać można jedynie poprzez zaktualizowanie bliźniaka ręcznie w chmurze.**_
    - _**Stan urządzenia (ProductionStatus) jest kontrolowany wyłącznie przez symulator IIoTSim**_
 
