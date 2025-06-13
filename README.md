@@ -50,6 +50,7 @@ Line-Controller to system monitorowania produkcji przemysłowej oparty na techno
    - Zainstaluj symulator IIoTSim
 
 2. **Konfiguracja Azure:**
+  
    a) IoT Hub:
       - Utwórz IoT Hub
       - Zarejestruj urządzenia, dla każdego urządzenia dodaj własność <br>"ProductionRate: [int]"
