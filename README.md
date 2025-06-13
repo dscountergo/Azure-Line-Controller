@@ -86,7 +86,8 @@ Line-Controller to system monitorowania produkcji przemysłowej oparty na techno
       - Dodaj akcję wysyłania e-maili, pamiętaj o rozkodowaniu wiadomości z kolejki. Przykładowa treść maila znajduje się w Code Snippets
 
 3. **Uruchomienie aplikacji:**
-   a) Przygotowanie symulatora:
+   
+  a) Przygotowanie symulatora:
       - Uruchom IIoTSim
       - Utwórz nowe urządzenie
       - Zapamiętaj nazwę urządzenia (OpcUaName)
