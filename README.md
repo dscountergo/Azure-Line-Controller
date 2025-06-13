@@ -107,7 +107,7 @@ Line-Controller to system monitorowania produkcji przemysłowej oparty na techno
 
 
 #### Struktura pliku konfiguracyjnego (config.json):
-```json
+```
 {
   "Devices": {
     "DefaultDevice": "Device1",
