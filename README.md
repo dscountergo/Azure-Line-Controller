@@ -4,27 +4,26 @@
 
 ### Table of Contents
 
-1. [Disclaimer](#disclaimer)
-2. [Introduction](#introduction)
-3. [Getting Started](#getting-started)
+1. [Introduction](#introduction)
+2. [Getting Started](#getting-started)
    - [System Requirements](#system-requirements)
    - [Step-by-step Guide](#step-by-step-guide)
    - [Configuration file structure (`config.json`)](#configuration-file-structure-configjson)
    - [OPC UA Nodes](#opc-ua-nodes)
-4. [Device Simulation](#device-simulation)
-5. [Management Panel](#management-panel)
+3. [Device Simulation](#device-simulation)
+4. [Management Panel](#management-panel)
    - [Devices Connection Panel](#1-devices-connection-panel)
    - [Active Devices Management](#2-active-devices-management)
    - [Device Logger](#device-logger)
-6. [Azure Platform Communication](#azure-platform-communication)
+5. [Azure Platform Communication](#azure-platform-communication)
    - [Device-to-Cloud (D2C) message format](#device-to-cloud-d2c-message-format)
    - [Device Twin](#device-twin)
    - [Direct methods](#direct-methods)
-7. [Business Logic and Calculations](#business-logic-and-calculations)
+6. [Business Logic and Calculations](#business-logic-and-calculations)
    - [Key Performance Indicators (KPIs)](#key-performance-indicators-kpis)
    - [Automatic reactions](#automatic-reactions)
-8. [Service Bus Queues](#service-bus-queues)
-9. [Code Snippets](#code-snippets)
+7. [Service Bus Queues](#service-bus-queues)
+8. [Code Snippets](#code-snippets)
 
 ### Introduction
 
