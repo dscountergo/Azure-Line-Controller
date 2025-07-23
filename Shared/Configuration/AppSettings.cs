@@ -40,7 +40,7 @@ namespace Shared.Configuration
             var examplePath = Path.Combine(sharedDir, "config.example.json");
             bool configJustCreated = false;
             // Globalny mutex dla całego systemu aby zapobiec race condition przy tworzeniu pliku konfiguracyjnego
-            using (var mutex = new System.Threading.Mutex(false, "Global\\AzureLineControllerConfigInit"))
+            using (var mutex = new System.Threading.Mutex(false, "Global\\LineAgentAzureConfigInit"))
             {
                 if (mutex.WaitOne(10000)) // czekaj maksymalnie 10 sekund na dostęp
                 {

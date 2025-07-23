@@ -1,4 +1,4 @@
-# Line-Controller Project Documentation
+# LineAgent-Azure Project Documentation
 
 ## Industrial IoT Production Monitoring System
 
@@ -28,7 +28,7 @@
 
 ### Introduction
 
-Line-Controller is an industrial production monitoring system based on IoT technologies, enabling company to transform production processes by connecting production lines to the Azure IoT platform. The system provides real-time monitoring, data analysis, and automatic failure handling.
+LineAgent-Azure is an industrial production monitoring system based on IoT technologies, enabling company to transform production processes by connecting production lines to the Azure IoT platform. The system provides real-time monitoring, data analysis, and automatic failure handling.
 
 #### Main Features:
 
@@ -113,7 +113,7 @@ Line-Controller is an industrial production monitoring system based on IoT techn
 
     a) **Configure the Project:**
 
-    - Open the `Line-Controller.sln` solution in Visual Studio.
+    - Open the `LineAgent-Azure.sln` solution in Visual Studio.
     - In Visual Studio, select the `LaunchService` profile and run the project for the first time. This will automatically generate the `Shared/config.json` file if it does not exist.
     - Open the generated `Shared/config.json` file and update it with the correct connection strings for your Azure resources and the device details (`IoTHubDeviceId`, `OpcUaName`, etc.).
 
@@ -353,7 +353,7 @@ The project uses the **FFactorySim** simulator (available from [GitHub](https://
 #### How it works
 
 - Each simulated device exposes an OPC UA server with a set of telemetry and state nodes, as described in the [OPC UA Nodes](#opc-ua-nodes) section.
-- The simulator allows you to create, start, and manage virtual devices, which then interact with the Line-Controller system just like real hardware.
+- The simulator allows you to create, start, and manage virtual devices, which then interact with the LineAgent-Azure system just like real hardware.
 
 #### Installation & Usage
 
@@ -368,16 +368,16 @@ The project uses the **FFactorySim** simulator (available from [GitHub](https://
    - Remember the device name (`OpcUaName`) – you will need it in your `config.json`.
    - You can create multiple devices if needed.
 
-3. **Connect to the Line-Controller**
+3. **Connect to the LineAgent-Azure**
 
    - Make sure your `config.json` contains the correct `OpcUaName` and OPC UA server address (`opc.tcp://localhost:4840/`) for each device.
-   - Start the Line-Controller application (see [Getting Started](#getting-started)).
+   - Start the LineAgent-Azure application (see [Getting Started](#getting-started)).
 
 4. **Simulation Details**
 
    - Each device simulates production data: status, workorder, good/bad counts, temperature, errors, etc.
    - Device state (`ProductionStatus`) is controlled only from the simulator UI.
-   - The Line-Controller system can only monitor device state and send direct method commands (e.g., EmergencyStop, ResetErrorStatus).
+   - The LineAgent-Azure system can only monitor device state and send direct method commands (e.g., EmergencyStop, ResetErrorStatus).
 
 5. **Limitations**
    - The trial version of IIoTSim may have a time limit (e.g., 30 minutes) and require a restart.
@@ -386,7 +386,7 @@ The project uses the **FFactorySim** simulator (available from [GitHub](https://
 #### Testing & Monitoring
 
 - You can use any OPC UA client to connect to the simulator at `opc.tcp://localhost:4840/` and browse node values.
-- All telemetry and state changes will be reflected in the Line-Controller system and visible in the management console and logger.
+- All telemetry and state changes will be reflected in the LineAgent-Azure system and visible in the management console and logger.
 
 ## Code Snippets
 
