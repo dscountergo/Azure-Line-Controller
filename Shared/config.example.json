@@ -1,0 +1,30 @@
+{
+  "Devices": {
+    "DefaultDevice": "Device1",
+    "Device1": {
+      "Name": "<DEVICE_NAME>",
+      "OpcUaName": "<LOCAL_SIMULATOR_DEVICE_NAME>",
+      "OpcUaServerUrl": "opc.tcp://localhost:4840/",
+      "IoTHubDeviceId": "<IOT_HUB_DEVICE_CLOUD_NAME>",
+      "IoTHubConnectionString": "<YOUR_DEVICE_CONNECTION_STRING>",
+      "OpcUaNodeIds": {
+        "ProductionStatus": "ns=2;s={DeviceName}/ProductionStatus",
+        "WorkorderId": "ns=2;s={DeviceName}/WorkorderId",
+        "Temperature": "ns=2;s={DeviceName}/Temperature",
+        "GoodCount": "ns=2;s={DeviceName}/GoodCount",
+        "BadCount": "ns=2;s={DeviceName}/BadCount",
+        "ProductionRate": "ns=2;s={DeviceName}/ProductionRate",
+        "DeviceError": "ns=2;s={DeviceName}/DeviceError",
+        "EmergencyStop": "ns=2;s={DeviceName}/EmergencyStop",
+        "ResetErrorStatus": "ns=2;s={DeviceName}/ResetErrorStatus"
+        }
+      }
+    },
+  "ServiceController": {
+    "ConnectionString": "<YOUR_SERVICE_CONTROLLER_CONNECTION_STRING>"
+  },
+  "ServiceBus": {
+    "ConnectionString": "<YOUR_SERVICE_BUS_CONNECTION_STRING>",
+    "QueueName": "emergency-queue"
+  }
+} 

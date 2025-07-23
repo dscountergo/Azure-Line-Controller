@@ -1,5 +1,5 @@
 
-Subject and Body content of email sending element in code view:
+--Subject and Body content of email sending element in code view:
 
 
 

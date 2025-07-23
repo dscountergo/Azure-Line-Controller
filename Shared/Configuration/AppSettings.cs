@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
+using System.IO;
 
 namespace Shared.Configuration
 {
@@ -13,10 +14,75 @@ namespace Shared.Configuration
         private static IConfiguration _configuration;
         private static DevicesConfiguration _devicesConfiguration;
 
+        private static string FindSharedDirectory()
+        {
+            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (dir != null)
+            {
+                var shared = Path.Combine(dir.FullName, "Shared");
+                if (Directory.Exists(shared))
+                    return shared;
+                dir = dir.Parent;
+            }
+            throw new DirectoryNotFoundException("Cannot find 'Shared' directory in parent folders.");
+        }
+
+        private static bool ConfigContainsPlaceholders(string configPath)
+        {
+            var text = File.ReadAllText(configPath);
+            return System.Text.RegularExpressions.Regex.IsMatch(text, "<[^>]+>");
+        }
+
         public static void Initialize()
         {
+            var sharedDir = FindSharedDirectory();
+            var configPath = Path.Combine(sharedDir, "config.json");
+            var examplePath = Path.Combine(sharedDir, "config.example.json");
+            bool configJustCreated = false;
+            // Globalny mutex dla całego systemu aby zapobiec race condition przy tworzeniu pliku konfiguracyjnego
+            using (var mutex = new System.Threading.Mutex(false, "Global\\AzureLineControllerConfigInit"))
+            {
+                if (mutex.WaitOne(10000)) // czekaj maksymalnie 10 sekund na dostęp
+                {
+                    try
+                    {
+                        if (!File.Exists(configPath))
+                        {
+                            if (File.Exists(examplePath))
+                            {
+                                File.Copy(examplePath, configPath);
+                                configJustCreated = true;
+                            }
+                            else
+                            {
+                                throw new FileNotFoundException($"Missing configuration and example file: {configPath}, {examplePath}");
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        mutex.ReleaseMutex();
+                    }
+                }
+            }
+
+            if (ConfigContainsPlaceholders(configPath))
+            {
+                if (configJustCreated)
+                {
+                    Console.WriteLine($"Configuration file generated: {configPath}. Please fill it with your data and restart the application.");
+                }
+                else
+                {
+                    Console.WriteLine($"Configuration file contains placeholder values. Please fill in your real connection strings and device names before running the application.\nFile: {configPath}");
+                }
+                Console.WriteLine("Application will now exit.");
+                Console.WriteLine("Press any key to exit...");
+                Console.ReadKey();
+                Environment.Exit(2);
+            }
             var builder = new ConfigurationBuilder()
-                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .SetBasePath(sharedDir)
                 .AddJsonFile("config.json", optional: false, reloadOnChange: true);
 
             _configuration = builder.Build();

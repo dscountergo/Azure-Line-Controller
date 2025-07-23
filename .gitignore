@@ -1,12 +1,14 @@
-# Pliki Visual Studio
+# Visual Studio files
 .vs/
 *.suo
 
-# Pliki buildów
+# Build files
 bin/
 obj/
 DeviceConsoleApp/CertificateStores/
 
-# Pliki tymczasowe
+# Temporary files
 *.log
 *.vsidx
+Shared/config.json
+*.code-workspace

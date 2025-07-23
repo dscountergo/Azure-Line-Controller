@@ -13,9 +13,8 @@ namespace DeviceLogger
         private static RabbitMQService? _rabbitMQService;
         private static readonly Dictionary<string, ConsoleColor> LogColorKeywords = new(StringComparer.OrdinalIgnoreCase)
         {
-            {"błąd", ConsoleColor.Red},
             {"error", ConsoleColor.Red}
-            // Możesz dodać kolejne słowa-klucze i kolory tutaj
+            // Add another label here
         };
 
         public static async Task Main(string[] args)

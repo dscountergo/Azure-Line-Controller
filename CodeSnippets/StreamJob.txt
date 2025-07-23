@@ -1,6 +1,5 @@
 
-
-SQL for Stream Job:
+--SQL for Stream Job:
 
 
 -- Production KPI archivization
@@ -13,7 +12,7 @@ WITH WindowData AS (
         MIN(CAST(BadCount AS bigint)) AS StartBadCount,
         MAX(CAST(BadCount AS bigint)) AS EndBadCount
     FROM
-        [eventhub-iot-telemetry]
+        [UL-Hub]
     GROUP BY
         DeviceId,
         TumblingWindow(minute, 5)
@@ -45,7 +44,7 @@ SELECT
 INTO
     [output-temperature-stats]
 FROM
-    [eventhub-iot-telemetry]
+    [UL-Hub]
 WHERE
     Temperature > 0 AND Temperature < 1000
 GROUP BY
@@ -71,7 +70,7 @@ SELECT
 INTO
     [output-device-errors]
 FROM
-    [eventhub-iot-telemetry]
+    [UL-Hub]
 WHERE
     ErrorState > 0
 GROUP BY
@@ -118,7 +117,7 @@ FROM
                     MAX(CASE WHEN (ErrorState & 4) != 0 THEN 1 ELSE 0 END) +
                     MAX(CASE WHEN (ErrorState & 8) != 0 THEN 1 ELSE 0 END) AS TotalErrorTypes
                 FROM
-                    [eventhub-iot-telemetry]
+                    [UL-Hub]
                 WHERE
                     ErrorState > 0
                 GROUP BY
@@ -160,7 +159,7 @@ FROM
                             MIN(CAST(BadCount AS bigint)) AS StartBadCount,
                             MAX(CAST(BadCount AS bigint)) AS EndBadCount
                         FROM
-                            [eventhub-iot-telemetry]
+                            [UL-Hub]
                         GROUP BY
                             DeviceId,
                             TumblingWindow(minute, 5)
@@ -192,7 +191,7 @@ SELECT
 INTO
     [output-email-queue]
 FROM
-    [eventhub-iot-telemetry]
+    [UL-Hub]
 WHERE
     ErrorState > 0
 GROUP BY
